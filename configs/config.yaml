@@ -1,0 +1,29 @@
+app:
+  name: taskflow
+  env: production
+
+server:
+  http:
+    host: 0.0.0.0
+    port: 8080
+  worker:
+    concurrency: 10
+
+redis:
+  addr: localhost:6379
+  password: ""
+  db: 0
+
+queues:
+  critical: 10
+  high: 5
+  default: 3
+  low: 1
+
+logging:
+  level: info
+  format: json
+
+metrics:
+  enabled: true
+  path: /metrics
