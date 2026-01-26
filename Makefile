@@ -1,4 +1,4 @@
-.PHONY: all build build-api build-server run-api run-server test lint clean docker-build docker-up docker-down deps tidy
+.PHONY: all build build-api build-server run-api run-server test lint clean docker-build docker-up docker-down deps tidy proto-gen
 
 GO=go
 GOFLAGS=-ldflags="-s -w"
@@ -68,3 +68,14 @@ redis-down:
 asynqmon:
 	@echo "Starting Asynqmon UI at http://localhost:8081"
 	docker run -d --name asynqmon -p 8081:8080 hibiken/asynqmon --redis-addr=host.docker.internal:6379
+
+# Proto generation
+proto-gen:
+	@echo "Generating protobuf code..."
+	protoc --go_out=. --go_opt=paths=source_relative \
+		--go-grpc_out=. --go-grpc_opt=paths=source_relative \
+		api/proto/grpc_task/v1/task.proto
+	@echo "Proto generation complete"
+
+proto-clean:
+	rm -f api/proto/grpc_task/v1/*.pb.go

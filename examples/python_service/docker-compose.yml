@@ -1,0 +1,19 @@
+services:
+  python-grpc-service:
+    build:
+      context: ../..  # 使用项目根目录作为 build context
+      dockerfile: examples/python_service/Dockerfile
+    container_name: python-grpc-service
+    ports:
+      - "50051:50051"
+    environment:
+      - GRPC_PORT=50051
+      - LOG_LEVEL=INFO
+    command: ["python", "server.py", "--port", "50051"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s = socket.socket(); s.connect(('localhost', 50051)); s.close()"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped

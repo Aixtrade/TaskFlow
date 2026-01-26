@@ -27,3 +27,27 @@ logging:
 metrics:
   enabled: true
   path: /metrics
+
+# gRPC 服务配置（开发环境）
+grpc_services:
+  enabled: true
+  services:
+    llm:
+      address: "localhost:50051"
+      timeout: 600s
+      pool_size: 5
+      health_check_interval: 30s
+    # trading:
+    #   address: "localhost:50052"
+    #   timeout: 300s
+    #   pool_size: 3
+    #   health_check_interval: 30s
+    # data:
+    #   address: "localhost:50053"
+    #   timeout: 1800s
+    #   pool_size: 2
+    #   health_check_interval: 30s
+  defaults:
+    timeout: 300s
+    pool_size: 5
+    health_check_interval: 30s

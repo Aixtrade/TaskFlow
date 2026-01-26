@@ -1,0 +1,167 @@
+syntax = "proto3";
+
+package grpc_task.v1;
+
+option go_package = "github.com/Aixtrade/TaskFlow/api/proto/grpc_task/v1;grpctaskv1";
+
+import "google/protobuf/struct.proto";
+
+// TaskExecutorService 定义了通用的流式任务执行接口
+// 可以被任何语言（Python、Java、Node.js、Rust 等）实现
+service TaskExecutorService {
+  // ExecuteTask 执行任务并通过流返回进度和结果
+  rpc ExecuteTask(ExecuteTaskRequest) returns (stream ExecuteTaskResponse);
+
+  // CancelTask 取消正在执行的任务
+  rpc CancelTask(CancelTaskRequest) returns (CancelTaskResponse);
+
+  // HealthCheck 检查服务健康状态
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+// ExecuteTaskRequest 任务执行请求
+message ExecuteTaskRequest {
+  // task_id 任务唯一标识
+  string task_id = 1;
+
+  // task_type 任务类型，对应 payload 中的 method
+  string task_type = 2;
+
+  // payload 任务数据
+  google.protobuf.Struct payload = 3;
+
+  // metadata 元数据
+  map<string, string> metadata = 4;
+
+  // options 执行选项
+  ExecutionOptions options = 5;
+}
+
+// ExecutionOptions 执行选项
+message ExecutionOptions {
+  // timeout_ms 超时时间（毫秒）
+  int64 timeout_ms = 1;
+
+  // enable_progress 是否启用进度报告
+  bool enable_progress = 2;
+
+  // progress_interval_ms 进度报告间隔（毫秒）
+  int32 progress_interval_ms = 3;
+}
+
+// ExecuteTaskResponse 任务执行响应（流式）
+message ExecuteTaskResponse {
+  oneof response {
+    // progress 任务进度
+    Progress progress = 1;
+
+    // result 任务结果
+    TaskResult result = 2;
+
+    // error 错误信息
+    ErrorDetail error = 3;
+  }
+}
+
+// Progress 任务进度
+message Progress {
+  // task_id 任务ID
+  string task_id = 1;
+
+  // percentage 完成百分比 (0-100)
+  int32 percentage = 2;
+
+  // stage 当前阶段
+  string stage = 3;
+
+  // message 进度消息
+  string message = 4;
+
+  // timestamp_ms 时间戳（毫秒）
+  int64 timestamp_ms = 5;
+
+  // metadata 额外元数据
+  map<string, string> metadata = 6;
+}
+
+// TaskResult 任务结果
+message TaskResult {
+  // task_id 任务ID
+  string task_id = 1;
+
+  // status 任务状态
+  TaskStatus status = 2;
+
+  // data 结果数据
+  google.protobuf.Struct data = 3;
+
+  // duration_ms 执行耗时（毫秒）
+  int64 duration_ms = 4;
+}
+
+// TaskStatus 任务状态枚举
+enum TaskStatus {
+  TASK_STATUS_UNSPECIFIED = 0;
+  TASK_STATUS_COMPLETED = 1;
+  TASK_STATUS_FAILED = 2;
+  TASK_STATUS_CANCELLED = 3;
+}
+
+// ErrorDetail 错误详情
+message ErrorDetail {
+  // code 错误码
+  string code = 1;
+
+  // message 错误消息
+  string message = 2;
+
+  // retryable 是否可重试
+  bool retryable = 3;
+
+  // retry_after_seconds 建议重试等待时间
+  int32 retry_after_seconds = 4;
+}
+
+// CancelTaskRequest 取消任务请求
+message CancelTaskRequest {
+  // task_id 要取消的任务ID
+  string task_id = 1;
+
+  // reason 取消原因
+  string reason = 2;
+}
+
+// CancelTaskResponse 取消任务响应
+message CancelTaskResponse {
+  // success 是否成功
+  bool success = 1;
+
+  // message 响应消息
+  string message = 2;
+}
+
+// HealthCheckRequest 健康检查请求
+message HealthCheckRequest {
+  // service_name 服务名称（可选）
+  string service_name = 1;
+}
+
+// HealthCheckResponse 健康检查响应
+message HealthCheckResponse {
+  // status 健康状态
+  HealthStatus status = 1;
+
+  // message 状态消息
+  string message = 2;
+
+  // details 详细信息
+  map<string, string> details = 3;
+}
+
+// HealthStatus 健康状态枚举
+enum HealthStatus {
+  HEALTH_STATUS_UNSPECIFIED = 0;
+  HEALTH_STATUS_HEALTHY = 1;
+  HEALTH_STATUS_UNHEALTHY = 2;
+  HEALTH_STATUS_DEGRADED = 3;
+}
