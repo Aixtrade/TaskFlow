@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 
 	"github.com/Aixtrade/TaskFlow/internal/config"
@@ -16,6 +17,7 @@ import (
 	"github.com/Aixtrade/TaskFlow/internal/worker"
 	"github.com/Aixtrade/TaskFlow/internal/worker/handlers/demo"
 	grpctask "github.com/Aixtrade/TaskFlow/internal/worker/handlers/grpc_task"
+	"github.com/Aixtrade/TaskFlow/pkg/progress"
 )
 
 func main() {
@@ -37,6 +39,17 @@ func main() {
 		zap.String("env", cfg.App.Env),
 		zap.Int("concurrency", cfg.Server.Worker.Concurrency),
 	)
+
+	// 初始化 Redis 客户端（用于进度发布）
+	redisClient := redis.NewClient(&redis.Options{
+		Addr:     cfg.Redis.Addr,
+		Password: cfg.Redis.Password,
+		DB:       cfg.Redis.DB,
+	})
+	defer redisClient.Close()
+
+	// 创建进度发布器
+	progressPublisher := progress.NewPublisher(redisClient, logger)
 
 	registry := worker.NewRegistry(logger)
 	registry.Register(demo.NewHandler(logger))
@@ -72,7 +85,7 @@ func main() {
 				HealthCheckInterval: cfg.GRPCServices.Defaults.HealthCheckInterval,
 			},
 		}
-		registry.Register(grpctask.NewHandler(logger, clientManager, grpcTaskConfig))
+		registry.Register(grpctask.NewHandler(logger, clientManager, grpcTaskConfig, progressPublisher))
 
 		logger.Info("grpc services initialized",
 			zap.Strings("services", clientManager.Services()),

@@ -11,6 +11,7 @@ import (
 	grpcclient "github.com/Aixtrade/TaskFlow/internal/infrastructure/grpc"
 	"github.com/Aixtrade/TaskFlow/internal/worker"
 	"github.com/Aixtrade/TaskFlow/pkg/payload"
+	"github.com/Aixtrade/TaskFlow/pkg/progress"
 	"github.com/Aixtrade/TaskFlow/pkg/tasktype"
 
 	pb "github.com/Aixtrade/TaskFlow/api/proto/grpc_task/v1"
@@ -25,16 +26,18 @@ type Config struct {
 // Handler 处理所有 gRPC 任务
 type Handler struct {
 	*worker.BaseHandler
-	clientManager *grpcclient.ClientManager
-	config        Config
+	clientManager     *grpcclient.ClientManager
+	config            Config
+	progressPublisher *progress.Publisher
 }
 
 // NewHandler 创建新的 gRPC handler
-func NewHandler(logger *zap.Logger, clientManager *grpcclient.ClientManager, cfg Config) *Handler {
+func NewHandler(logger *zap.Logger, clientManager *grpcclient.ClientManager, cfg Config, progressPublisher *progress.Publisher) *Handler {
 	return &Handler{
-		BaseHandler:   worker.NewBaseHandler(logger),
-		clientManager: clientManager,
-		config:        cfg,
+		BaseHandler:       worker.NewBaseHandler(logger),
+		clientManager:     clientManager,
+		config:            cfg,
+		progressPublisher: progressPublisher,
 	}
 }
 
@@ -115,9 +118,31 @@ func (h *Handler) ProcessTask(ctx context.Context, task *asynq.Task) error {
 			zap.String("stage", prog.Stage),
 			zap.String("message", prog.Message),
 		)
+
+		// 发布进度到 Redis Stream
+		if h.progressPublisher != nil {
+			progressData := &progress.Progress{
+				TaskID:      taskID,
+				Percentage:  prog.Percentage,
+				Stage:       prog.Stage,
+				Message:     prog.Message,
+				TimestampMs: prog.TimestampMs,
+				Metadata:    prog.Metadata,
+			}
+			if pubErr := h.progressPublisher.Publish(ctx, progressData); pubErr != nil {
+				h.Logger().Warn("failed to publish progress",
+					zap.String("task_id", taskID),
+					zap.Error(pubErr),
+				)
+			}
+		}
 	})
 
 	if err != nil {
+		// 发布失败事件
+		if h.progressPublisher != nil {
+			h.progressPublisher.PublishCompletion(ctx, taskID, "failed", err.Error())
+		}
 		return h.handleError(taskID, p.Service, err)
 	}
 
@@ -130,11 +155,24 @@ func (h *Handler) ProcessTask(ctx context.Context, task *asynq.Task) error {
 	)
 
 	if result.Status == pb.TaskStatus_TASK_STATUS_FAILED {
+		// 发布失败事件
+		if h.progressPublisher != nil {
+			h.progressPublisher.PublishCompletion(ctx, taskID, "failed", "task failed on grpc service")
+		}
 		return fmt.Errorf("task failed on grpc service")
 	}
 
 	if result.Status == pb.TaskStatus_TASK_STATUS_CANCELLED {
+		// 发布取消事件
+		if h.progressPublisher != nil {
+			h.progressPublisher.PublishCompletion(ctx, taskID, "cancelled", "task cancelled on grpc service")
+		}
 		return fmt.Errorf("task cancelled on grpc service")
+	}
+
+	// 发布完成事件
+	if h.progressPublisher != nil {
+		h.progressPublisher.PublishCompletion(ctx, taskID, "completed", "task completed successfully")
 	}
 
 	h.LogTaskComplete(h.Type(), taskID)

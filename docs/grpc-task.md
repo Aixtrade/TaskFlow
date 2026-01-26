@@ -200,6 +200,48 @@ curl -X POST http://localhost:8080/api/v1/tasks \
   }'
 ```
 
+## 实时进度订阅
+
+TaskFlow 支持通过 SSE (Server-Sent Events) 实时订阅任务进度。进度数据存储在 Redis Streams 中，支持历史回放。
+
+### 快速示例
+
+```bash
+# SSE 订阅进度
+curl -N http://localhost:8080/api/v1/tasks/{task_id}/progress/stream
+
+# 获取最新进度
+curl http://localhost:8080/api/v1/tasks/{task_id}/progress
+```
+
+**详细 API 文档请参阅 [api.md](api.md#task-progress)**
+
+### 客户端示例
+
+**JavaScript:**
+
+```javascript
+const es = new EventSource(`/api/v1/tasks/${taskId}/progress/stream`);
+es.addEventListener('progress', (e) => {
+    const data = JSON.parse(e.data);
+    console.log(`[${data.percentage}%] ${data.message}`);
+});
+es.addEventListener('done', () => es.close());
+```
+
+**Python:**
+
+```python
+import sseclient, requests, json
+
+url = f"http://localhost:8080/api/v1/tasks/{task_id}/progress/stream"
+for event in sseclient.SSEClient(requests.get(url, stream=True)).events():
+    if event.event == 'progress':
+        print(json.loads(event.data))
+    elif event.event == 'done':
+        break
+```
+
 ## 运行时行为与错误处理
 
 - `service` 不存在：任务直接 `SkipRetry`
@@ -209,7 +251,12 @@ curl -X POST http://localhost:8080/api/v1/tasks \
 
 ## 关联文件
 
-- `internal/worker/handlers/grpc_task/handler.go`
-- `pkg/payload/grpc_task.go`
-- `api/proto/grpc_task/v1/task.proto`
-- `examples/python_service/server.py`
+- `internal/worker/handlers/grpc_task/handler.go` - gRPC 任务处理器
+- `pkg/payload/grpc_task.go` - Payload 结构定义
+- `api/proto/grpc_task/v1/task.proto` - gRPC 协议定义
+- `examples/python_service/server.py` - Python 服务端示例
+- `pkg/progress/` - 进度发布/订阅模块
+  - `types.go` - 进度数据结构
+  - `publisher.go` - 发布到 Redis Stream
+  - `subscriber.go` - 从 Redis Stream 订阅
+- `internal/interfaces/http/handler/progress_handler.go` - SSE 端点处理器

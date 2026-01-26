@@ -162,6 +162,173 @@ Deletes a task from the queue.
 
 ---
 
+## Task Progress
+
+### Get Latest Progress
+
+Retrieves the latest progress for a task.
+
+**Endpoint:** `GET /api/v1/tasks/:id/progress`
+
+**Response:** `200 OK`
+
+```json
+{
+  "progress": {
+    "task_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+    "percentage": 50,
+    "stage": "processing",
+    "message": "Processing data...",
+    "timestamp_ms": 1737884800000
+  },
+  "is_final": false,
+  "stream_id": "1737884800000-0"
+}
+```
+
+**Error Responses:**
+
+| Code | Error Code | Description |
+|------|------------|-------------|
+| 404 | PROGRESS_NOT_FOUND | No progress found for this task |
+| 500 | PROGRESS_FETCH_ERROR | Server error |
+
+---
+
+### Stream Progress (SSE)
+
+Subscribes to real-time progress updates via Server-Sent Events.
+
+**Endpoint:** `GET /api/v1/tasks/:id/progress/stream`
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| history | string | No | Set to "true" to include historical progress |
+| start_id | string | No | Stream ID to start from ("0" for all history, "$" for new only) |
+
+**Response:** `200 OK` (text/event-stream)
+
+```
+event: progress
+data: {"task_id":"xxx","percentage":30,"stage":"processing","message":"Processing...","timestamp_ms":1737884800000}
+
+event: progress
+data: {"task_id":"xxx","percentage":100,"stage":"completed","message":"Done","timestamp_ms":1737884810000}
+
+event: done
+data: {"task_id":"xxx","status":"completed"}
+```
+
+**Event Types:**
+
+| Event | Description |
+|-------|-------------|
+| progress | Progress update |
+| history | Historical progress (when history=true) |
+| done | Task completed/failed/cancelled |
+| error | Error occurred |
+
+**Example (curl):**
+
+```bash
+curl -N "http://localhost:8080/api/v1/tasks/xxx/progress/stream"
+```
+
+**Example (JavaScript):**
+
+```javascript
+const es = new EventSource(`/api/v1/tasks/${taskId}/progress/stream`);
+es.addEventListener('progress', (e) => {
+    const data = JSON.parse(e.data);
+    console.log(`[${data.percentage}%] ${data.message}`);
+});
+es.addEventListener('done', () => es.close());
+```
+
+---
+
+### Stream Multiple Progress (SSE)
+
+Subscribes to progress updates for multiple tasks simultaneously.
+
+**Endpoint:** `GET /api/v1/progress/stream`
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| task_ids | string | Yes | Comma-separated task IDs (max 10) |
+
+**Response:** `200 OK` (text/event-stream)
+
+```
+event: progress
+data: {"task_id":"id1","progress":{"percentage":30,...}}
+
+event: progress
+data: {"task_id":"id2","progress":{"percentage":50,...}}
+```
+
+---
+
+### Get Progress History
+
+Retrieves historical progress entries for a task.
+
+**Endpoint:** `GET /api/v1/tasks/:id/progress/history`
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| start_id | string | No | Stream ID to start from (default: "-") |
+
+**Response:** `200 OK`
+
+```json
+{
+  "task_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "count": 5,
+  "history": [
+    {
+      "stream_id": "1737884800000-0",
+      "progress": {"percentage": 10, "stage": "init", "message": "Starting..."},
+      "is_final": false
+    },
+    {
+      "stream_id": "1737884810000-0",
+      "progress": {"percentage": 100, "stage": "completed", "message": "Done"},
+      "is_final": true,
+      "status": "completed"
+    }
+  ]
+}
+```
+
+---
+
+### Get Progress Info
+
+Retrieves metadata about a task's progress stream.
+
+**Endpoint:** `GET /api/v1/tasks/:id/progress/info`
+
+**Response:** `200 OK`
+
+```json
+{
+  "task_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "has_progress": true,
+  "length": 5,
+  "first_entry": "1737884800000-0",
+  "last_entry": "1737884810000-0"
+}
+```
+
+---
+
 ## Queues
 
 ### Get Queue Stats
