@@ -25,10 +25,10 @@ build-server:
 	$(GO) build $(GOFLAGS) -o $(SERVER_BINARY) ./cmd/server
 
 run-api:
-	$(GO) run ./cmd/api -config configs/config.dev.yaml
+	$(GO) run ./cmd/api -config configs/config.yaml
 
 run-server:
-	$(GO) run ./cmd/server -config configs/config.dev.yaml
+	$(GO) run ./cmd/server -config configs/config.yaml
 
 test:
 	$(GO) test -v -race -cover ./...
