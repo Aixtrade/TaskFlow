@@ -3,6 +3,7 @@ package asynq
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/hibiken/asynq"
@@ -152,6 +153,29 @@ func (c *Client) DeleteTask(queue, taskID string) error {
 
 func (c *Client) GetTaskInfo(queue, taskID string) (*asynq.TaskInfo, error) {
 	return c.inspector.GetTaskInfo(queue, taskID)
+}
+
+func (c *Client) ListActiveTasks(queue string, page, size int) ([]*asynq.TaskInfo, error) {
+	return c.inspector.ListActiveTasks(queue, page, size)
+}
+
+func (c *Client) ListTasks(queue, state string, page, size int) ([]*asynq.TaskInfo, error) {
+	switch state {
+	case "active":
+		return c.inspector.ListActiveTasks(queue, page, size)
+	case "pending":
+		return c.inspector.ListPendingTasks(queue, page, size)
+	case "scheduled":
+		return c.inspector.ListScheduledTasks(queue, page, size)
+	case "retry":
+		return c.inspector.ListRetryTasks(queue, page, size)
+	case "archived":
+		return c.inspector.ListArchivedTasks(queue, page, size)
+	case "completed":
+		return c.inspector.ListCompletedTasks(queue, page, size)
+	default:
+		return nil, errors.New("invalid task state")
+	}
 }
 
 func (c *Client) GetQueueInfo(queue string) (*asynq.QueueInfo, error) {

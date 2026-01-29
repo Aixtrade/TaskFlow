@@ -60,6 +60,13 @@ type GetTaskResponse struct {
 	NextProcessAt string `json:"next_process_at,omitempty"`
 }
 
+type TaskListResponse struct {
+	ID    string `json:"id"`
+	Queue string `json:"queue"`
+	Type  string `json:"type"`
+	State string `json:"state"`
+}
+
 type QueueStatsResponse struct {
 	Queue     string `json:"queue"`
 	Pending   int    `json:"pending"`

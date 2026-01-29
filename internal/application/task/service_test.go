@@ -46,6 +46,10 @@ func (f *fakeClient) GetTaskInfo(queue, taskID string) (*asynq.TaskInfo, error) 
 	return f.getInfo, nil
 }
 
+func (f *fakeClient) ListTasks(queue, state string, page, size int) ([]*asynq.TaskInfo, error) {
+	return nil, nil
+}
+
 func (f *fakeClient) CancelTask(taskID string) error {
 	return f.cancelErr
 }

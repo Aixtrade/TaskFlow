@@ -3,6 +3,7 @@ package handler
 import (
 	"errors"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 
@@ -242,6 +243,67 @@ func (h *TaskHandler) GetQueueStats(c *gin.Context) {
 			Retry:     s.Retry,
 			Archived:  s.Archived,
 			Completed: s.Completed,
+		}
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
+func (h *TaskHandler) ListTasks(c *gin.Context) {
+	queue := c.Query("queue")
+	if queue == "" {
+		queue = "default"
+	}
+
+	status := c.Query("status")
+
+	page := 0
+	if value := c.Query("page"); value != "" {
+		if parsed, err := strconv.Atoi(value); err == nil {
+			page = parsed
+		}
+	}
+
+	size := 20
+	if value := c.Query("size"); value != "" {
+		if parsed, err := strconv.Atoi(value); err == nil {
+			size = parsed
+		}
+	}
+
+	query := &taskapp.ListTasksQuery{
+		Queue:  queue,
+		Status: status,
+		Page:   page,
+		Size:   size,
+	}
+
+	result, err := h.service.ListTasks(c.Request.Context(), query)
+	if err != nil {
+		status := http.StatusInternalServerError
+		code := "LIST_TASKS_FAILED"
+		if errors.Is(err, apperrors.ErrInvalidQueue) {
+			status = http.StatusBadRequest
+			code = "INVALID_QUEUE"
+		}
+		if errors.Is(err, apperrors.ErrInvalidTaskState) {
+			status = http.StatusBadRequest
+			code = "INVALID_TASK_STATE"
+		}
+		c.JSON(status, dto.ErrorResponse{
+			Error: err.Error(),
+			Code:  code,
+		})
+		return
+	}
+
+	response := make([]dto.TaskListResponse, len(result))
+	for i, item := range result {
+		response[i] = dto.TaskListResponse{
+			ID:    item.ID,
+			Queue: item.Queue,
+			Type:  item.Type,
+			State: item.State,
 		}
 	}
 

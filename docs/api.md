@@ -112,6 +112,55 @@ Retrieves task information by ID.
 
 ---
 
+### List Tasks
+
+Retrieves tasks for a specific queue and status.
+
+**Endpoint:** `GET /api/v1/tasks`
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| queue | string | No | Queue name (default: "default") |
+| status | string | No | Task status (default: "active") |
+| page | int | No | Page index (default: 0) |
+| size | int | No | Page size (default: 20) |
+
+**Status Options:**
+
+| Status | Description |
+|--------|-------------|
+| pending | Task is waiting to be processed |
+| active | Task is currently being processed |
+| scheduled | Task is scheduled for future execution |
+| retry | Task is waiting for retry |
+| archived | Task failed and was archived |
+| completed | Task completed successfully |
+
+**Response:** `200 OK`
+
+```json
+[
+  {
+    "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+    "queue": "default",
+    "type": "demo",
+    "state": "active"
+  }
+]
+```
+
+**Error Responses:**
+
+| Code | Error Code | Description |
+|------|------------|-------------|
+| 400 | INVALID_QUEUE | Invalid queue |
+| 400 | INVALID_TASK_STATE | Invalid task status |
+| 500 | LIST_TASKS_FAILED | Server error |
+
+---
+
 ### Cancel Task
 
 Cancels a pending or scheduled task.

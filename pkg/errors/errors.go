@@ -13,6 +13,7 @@ var (
 	ErrInvalidPayload    = errors.New("invalid payload")
 	ErrInvalidTaskType   = errors.New("invalid task type")
 	ErrInvalidTaskID     = errors.New("invalid task id")
+	ErrInvalidTaskState  = errors.New("invalid task state")
 	ErrInvalidQueue      = errors.New("invalid queue")
 	ErrQueueFull         = errors.New("queue is full")
 	ErrTimeout           = errors.New("operation timeout")

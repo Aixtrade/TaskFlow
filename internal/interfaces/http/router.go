@@ -78,6 +78,7 @@ func (r *Router) setupAPIRoutes() {
 		tasks := v1.Group("/tasks")
 		{
 			tasks.POST("", taskHandler.Create)
+			tasks.GET("", taskHandler.ListTasks)
 			tasks.GET("/:id", taskHandler.Get)
 			tasks.DELETE("/:id", taskHandler.Delete)
 			tasks.POST("/:id/cancel", taskHandler.Cancel)

@@ -22,6 +22,7 @@ type Service struct {
 type TaskClient interface {
 	Enqueue(ctx context.Context, t *task.Task, opts ...asynqqueue.EnqueueOptions) (*asynq.TaskInfo, error)
 	GetTaskInfo(queue, taskID string) (*asynq.TaskInfo, error)
+	ListTasks(queue, state string, page, size int) ([]*asynq.TaskInfo, error)
 	CancelTask(taskID string) error
 	DeleteTask(queue, taskID string) error
 	GetQueueInfo(queue string) (*asynq.QueueInfo, error)
@@ -112,6 +113,13 @@ type TaskInfo struct {
 	Retried       int    `json:"retried"`
 	LastErr       string `json:"last_err,omitempty"`
 	NextProcessAt string `json:"next_process_at,omitempty"`
+}
+
+type TaskListItem struct {
+	ID    string `json:"id"`
+	Queue string `json:"queue"`
+	Type  string `json:"type"`
+	State string `json:"state"`
 }
 
 func (s *Service) GetTask(ctx context.Context, query *GetTaskQuery) (*TaskInfo, error) {
@@ -208,4 +216,28 @@ func (s *Service) GetQueueStats(ctx context.Context, query *GetQueueStatsQuery) 
 	}
 
 	return s.client.GetAllQueueStats()
+}
+
+func (s *Service) ListTasks(ctx context.Context, query *ListTasksQuery) ([]TaskListItem, error) {
+	_ = ctx
+	if err := query.Validate(); err != nil {
+		return nil, err
+	}
+
+	infos, err := s.client.ListTasks(query.Queue, query.Status, query.Page, query.Size)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list tasks: %w", err)
+	}
+
+	result := make([]TaskListItem, len(infos))
+	for i, info := range infos {
+		result[i] = TaskListItem{
+			ID:    info.ID,
+			Queue: info.Queue,
+			Type:  info.Type,
+			State: info.State.String(),
+		}
+	}
+
+	return result, nil
 }
