@@ -103,7 +103,16 @@ TaskFlow/
 
 ## Configuration
 
-TaskFlow uses YAML configuration with environment variable overrides:
+TaskFlow uses YAML configuration with environment variable overrides. Create local configs from the examples:
+
+```bash
+cp configs/config.yaml.example configs/config.yaml
+cp configs/config.dev.yaml.example configs/config.dev.yaml
+```
+
+The local `configs/*.yaml` files are ignored by git.
+
+Example structure:
 
 ```yaml
 app:

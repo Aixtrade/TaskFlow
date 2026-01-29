@@ -103,7 +103,16 @@ TaskFlow/
 
 ## 配置
 
-TaskFlow 使用 YAML 配置文件，支持环境变量覆盖：
+TaskFlow 使用 YAML 配置文件，支持环境变量覆盖。请先从示例创建本地配置：
+
+```bash
+cp configs/config.yaml.example configs/config.yaml
+cp configs/config.dev.yaml.example configs/config.dev.yaml
+```
+
+本地的 `configs/*.yaml` 会被 git 忽略。
+
+示例结构：
 
 ```yaml
 app:
