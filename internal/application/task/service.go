@@ -3,28 +3,32 @@ package task
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/hibiken/asynq"
 	"go.uber.org/zap"
 
 	"github.com/Aixtrade/TaskFlow/internal/domain/task"
 	asynqqueue "github.com/Aixtrade/TaskFlow/internal/infrastructure/queue/asynq"
-)
-
-var (
-	ErrInvalidTaskType = errors.New("invalid task type")
-	ErrInvalidPayload  = errors.New("invalid payload")
-	ErrInvalidTaskID   = errors.New("invalid task id")
-	ErrInvalidQueue    = errors.New("invalid queue")
-	ErrTaskNotFound    = errors.New("task not found")
+	apperrors "github.com/Aixtrade/TaskFlow/pkg/errors"
 )
 
 type Service struct {
-	client *asynqqueue.Client
+	client TaskClient
 	logger *zap.Logger
 }
 
-func NewService(client *asynqqueue.Client, logger *zap.Logger) *Service {
+type TaskClient interface {
+	Enqueue(ctx context.Context, t *task.Task, opts ...asynqqueue.EnqueueOptions) (*asynq.TaskInfo, error)
+	GetTaskInfo(queue, taskID string) (*asynq.TaskInfo, error)
+	CancelTask(taskID string) error
+	DeleteTask(queue, taskID string) error
+	GetQueueInfo(queue string) (*asynq.QueueInfo, error)
+	GetAllQueueStats() ([]asynqqueue.QueueStats, error)
+}
+
+func NewService(client TaskClient, logger *zap.Logger) *Service {
 	return &Service{
 		client: client,
 		logger: logger,
@@ -44,7 +48,7 @@ func (s *Service) CreateTask(ctx context.Context, cmd *CreateTaskCommand) (*Crea
 
 	t, err := task.NewTask(cmd.Type, cmd.Payload)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to build task: %w", err)
 	}
 
 	t.ID = uuid.New().String()
@@ -76,11 +80,14 @@ func (s *Service) CreateTask(ctx context.Context, cmd *CreateTaskCommand) (*Crea
 
 	info, err := s.client.Enqueue(ctx, t, opts)
 	if err != nil {
+		if errors.Is(err, asynq.ErrTaskIDConflict) {
+			return nil, errors.Join(apperrors.ErrTaskAlreadyExists, err)
+		}
 		s.logger.Error("failed to enqueue task",
 			zap.String("type", t.Type.String()),
 			zap.Error(err),
 		)
-		return nil, err
+		return nil, fmt.Errorf("failed to enqueue task: %w", err)
 	}
 
 	s.logger.Info("task created",
@@ -97,13 +104,13 @@ func (s *Service) CreateTask(ctx context.Context, cmd *CreateTaskCommand) (*Crea
 }
 
 type TaskInfo struct {
-	ID          string `json:"id"`
-	Queue       string `json:"queue"`
-	Type        string `json:"type"`
-	State       string `json:"state"`
-	MaxRetry    int    `json:"max_retry"`
-	Retried     int    `json:"retried"`
-	LastErr     string `json:"last_err,omitempty"`
+	ID            string `json:"id"`
+	Queue         string `json:"queue"`
+	Type          string `json:"type"`
+	State         string `json:"state"`
+	MaxRetry      int    `json:"max_retry"`
+	Retried       int    `json:"retried"`
+	LastErr       string `json:"last_err,omitempty"`
 	NextProcessAt string `json:"next_process_at,omitempty"`
 }
 
@@ -114,7 +121,10 @@ func (s *Service) GetTask(ctx context.Context, query *GetTaskQuery) (*TaskInfo, 
 
 	info, err := s.client.GetTaskInfo(query.Queue, query.TaskID)
 	if err != nil {
-		return nil, ErrTaskNotFound
+		if errors.Is(err, asynq.ErrTaskNotFound) {
+			return nil, errors.Join(apperrors.ErrTaskNotFound, err)
+		}
+		return nil, fmt.Errorf("failed to get task: %w", err)
 	}
 
 	result := &TaskInfo{
@@ -141,11 +151,14 @@ func (s *Service) CancelTask(ctx context.Context, cmd *CancelTaskCommand) error 
 
 	err := s.client.CancelTask(cmd.TaskID)
 	if err != nil {
+		if errors.Is(err, asynq.ErrTaskNotFound) {
+			return errors.Join(apperrors.ErrTaskNotFound, err)
+		}
 		s.logger.Error("failed to cancel task",
 			zap.String("task_id", cmd.TaskID),
 			zap.Error(err),
 		)
-		return err
+		return fmt.Errorf("failed to cancel task: %w", err)
 	}
 
 	s.logger.Info("task cancelled", zap.String("task_id", cmd.TaskID))
@@ -159,12 +172,15 @@ func (s *Service) DeleteTask(ctx context.Context, cmd *DeleteTaskCommand) error 
 
 	err := s.client.DeleteTask(cmd.Queue, cmd.TaskID)
 	if err != nil {
+		if errors.Is(err, asynq.ErrTaskNotFound) {
+			return errors.Join(apperrors.ErrTaskNotFound, err)
+		}
 		s.logger.Error("failed to delete task",
 			zap.String("task_id", cmd.TaskID),
 			zap.String("queue", cmd.Queue),
 			zap.Error(err),
 		)
-		return err
+		return fmt.Errorf("failed to delete task: %w", err)
 	}
 
 	s.logger.Info("task deleted",

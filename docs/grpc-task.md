@@ -50,12 +50,14 @@ grpc_services:
     llm:
       address: "llm-service:50051"
       timeout: 600s
-      pool_size: 10
       health_check_interval: 30s
+      max_retries: 3
+      retry_delay: 1s
   defaults:
     timeout: 300s
-    pool_size: 5
     health_check_interval: 30s
+    max_retries: 3
+    retry_delay: 1s
 ```
 
 服务名 `llm` 需要与 Payload 的 `service` 字段一致。

@@ -4,26 +4,27 @@ import (
 	"encoding/json"
 	"time"
 
+	apperrors "github.com/Aixtrade/TaskFlow/pkg/errors"
 	"github.com/Aixtrade/TaskFlow/pkg/tasktype"
 )
 
 type CreateTaskCommand struct {
-	Type       tasktype.Type   `json:"type"`
-	Payload    json.RawMessage `json:"payload"`
-	Queue      string          `json:"queue,omitempty"`
-	MaxRetries int             `json:"max_retries,omitempty"`
-	Timeout    time.Duration   `json:"timeout,omitempty"`
-	ProcessAt  time.Time       `json:"process_at,omitempty"`
-	Unique     time.Duration   `json:"unique,omitempty"`
+	Type       tasktype.Type     `json:"type"`
+	Payload    json.RawMessage   `json:"payload"`
+	Queue      string            `json:"queue,omitempty"`
+	MaxRetries int               `json:"max_retries,omitempty"`
+	Timeout    time.Duration     `json:"timeout,omitempty"`
+	ProcessAt  time.Time         `json:"process_at,omitempty"`
+	Unique     time.Duration     `json:"unique,omitempty"`
 	Metadata   map[string]string `json:"metadata,omitempty"`
 }
 
 func (c *CreateTaskCommand) Validate() error {
 	if !c.Type.IsValid() {
-		return ErrInvalidTaskType
+		return apperrors.ErrInvalidTaskType
 	}
 	if len(c.Payload) == 0 {
-		return ErrInvalidPayload
+		return apperrors.ErrInvalidPayload
 	}
 	return nil
 }
@@ -34,7 +35,7 @@ type CancelTaskCommand struct {
 
 func (c *CancelTaskCommand) Validate() error {
 	if c.TaskID == "" {
-		return ErrInvalidTaskID
+		return apperrors.ErrInvalidTaskID
 	}
 	return nil
 }
@@ -46,10 +47,10 @@ type DeleteTaskCommand struct {
 
 func (c *DeleteTaskCommand) Validate() error {
 	if c.TaskID == "" {
-		return ErrInvalidTaskID
+		return apperrors.ErrInvalidTaskID
 	}
 	if c.Queue == "" {
-		return ErrInvalidQueue
+		return apperrors.ErrInvalidQueue
 	}
 	return nil
 }

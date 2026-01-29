@@ -5,36 +5,7 @@ import (
 	"time"
 
 	"github.com/hibiken/asynq"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 	"go.uber.org/zap"
-)
-
-var (
-	taskProcessedTotal = promauto.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "taskflow_tasks_processed_total",
-			Help: "Total number of processed tasks",
-		},
-		[]string{"type", "status"},
-	)
-
-	taskDuration = promauto.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name:    "taskflow_task_duration_seconds",
-			Help:    "Task processing duration in seconds",
-			Buckets: prometheus.ExponentialBuckets(0.01, 2, 15),
-		},
-		[]string{"type"},
-	)
-
-	taskRetries = promauto.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "taskflow_task_retries_total",
-			Help: "Total number of task retries",
-		},
-		[]string{"type"},
-	)
 )
 
 func LoggingMiddleware(logger *zap.Logger) asynq.MiddlewareFunc {
@@ -67,32 +38,6 @@ func LoggingMiddleware(logger *zap.Logger) asynq.MiddlewareFunc {
 					zap.Duration("duration", duration),
 				)
 			}
-
-			return err
-		})
-	}
-}
-
-func MetricsMiddleware() asynq.MiddlewareFunc {
-	return func(h asynq.Handler) asynq.Handler {
-		return asynq.HandlerFunc(func(ctx context.Context, t *asynq.Task) error {
-			start := time.Now()
-
-			retryCount := GetRetryCount(ctx)
-			if retryCount > 0 {
-				taskRetries.WithLabelValues(t.Type()).Inc()
-			}
-
-			err := h.ProcessTask(ctx, t)
-
-			duration := time.Since(start).Seconds()
-			taskDuration.WithLabelValues(t.Type()).Observe(duration)
-
-			status := "success"
-			if err != nil {
-				status = "failure"
-			}
-			taskProcessedTotal.WithLabelValues(t.Type(), status).Inc()
 
 			return err
 		})

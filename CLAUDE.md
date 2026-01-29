@@ -28,7 +28,7 @@ make test-coverage      # Generate HTML coverage report
 make lint               # Run golangci-lint
 
 # Docker
-make docker-up          # Start full stack (Redis, API, Worker, Prometheus)
+make docker-up          # Start full stack (Redis, API, Worker)
 make docker-down        # Stop Docker Compose stack
 ```
 
@@ -42,8 +42,8 @@ make docker-down        # Stop Docker Compose stack
 ```
 internal/
 ├── application/task/    # CQRS: commands (Create, Cancel, Delete) and queries
-├── domain/task/         # Task entity, repository interface, domain errors
-├── infrastructure/      # Asynq client/server wrappers, logging, metrics
+├── domain/task/         # Task entity, repository interface
+├── infrastructure/      # Asynq client/server wrappers, logging
 ├── interfaces/http/     # Gin router, handlers, DTOs, middleware
 └── worker/              # Handler registry, base handler, middleware
 
@@ -113,4 +113,3 @@ YAML config in `configs/`. Environment variables override with `TASKFLOW_` prefi
 - `DELETE /api/v1/tasks/:id` - Delete task
 - `GET /api/v1/queues/stats` - Queue statistics
 - `GET /health`, `/ready`, `/live` - Health checks
-- `GET /metrics` - Prometheus metrics

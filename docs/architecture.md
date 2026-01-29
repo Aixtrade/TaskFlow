@@ -62,12 +62,11 @@ internal/
 │
 ├── domain/task/           # Domain layer
 │   ├── entity.go          # Task entity
-│   ├── repository.go      # Repository interface
-│   └── errors.go          # Domain errors
+│   └── repository.go      # Repository interface
 │
 ├── infrastructure/        # Infrastructure layer
 │   ├── queue/asynq/       # Asynq client/server wrappers
-│   └── observability/     # Logging and metrics
+│   └── observability/     # Logging
 │
 ├── interfaces/http/       # HTTP interface layer
 │   ├── handler/           # HTTP handlers
@@ -87,13 +86,12 @@ internal/
 
 | Component | Technology |
 |-----------|------------|
-| Language | Go 1.21+ |
+| Language | Go 1.25.1 |
 | HTTP Framework | Gin |
 | Task Queue | Asynq |
 | Message Broker | Redis |
 | Configuration | Viper |
 | Logging | Zap |
-| Metrics | Prometheus |
 
 ## Data Flow
 
@@ -137,7 +135,6 @@ Higher weight = more processing time allocation.
 
 - **Recovery** - Panic recovery
 - **Logger** - Request logging
-- **Metrics** - Prometheus metrics
 - **CORS** - Cross-origin requests
 - **RequestID** - Request tracing
 
@@ -145,7 +142,6 @@ Higher weight = more processing time allocation.
 
 - **Recovery** - Panic recovery
 - **Logging** - Task execution logging
-- **Metrics** - Task metrics
 
 ## Scalability
 

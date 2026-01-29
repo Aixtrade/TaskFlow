@@ -1,12 +1,14 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 
 	taskapp "github.com/Aixtrade/TaskFlow/internal/application/task"
 	"github.com/Aixtrade/TaskFlow/internal/interfaces/http/dto"
+	apperrors "github.com/Aixtrade/TaskFlow/pkg/errors"
 )
 
 type TaskHandler struct {
@@ -72,13 +74,16 @@ func (h *TaskHandler) Create(c *gin.Context) {
 		status := http.StatusInternalServerError
 		code := "INTERNAL_ERROR"
 
-		switch err {
-		case taskapp.ErrInvalidTaskType:
+		switch {
+		case errors.Is(err, apperrors.ErrInvalidTaskType):
 			status = http.StatusBadRequest
 			code = "INVALID_TASK_TYPE"
-		case taskapp.ErrInvalidPayload:
+		case errors.Is(err, apperrors.ErrInvalidPayload):
 			status = http.StatusBadRequest
 			code = "INVALID_PAYLOAD"
+		case errors.Is(err, apperrors.ErrTaskAlreadyExists):
+			status = http.StatusConflict
+			code = "TASK_ALREADY_EXISTS"
 		}
 
 		c.JSON(status, dto.ErrorResponse{
@@ -113,7 +118,14 @@ func (h *TaskHandler) Get(c *gin.Context) {
 		status := http.StatusInternalServerError
 		code := "INTERNAL_ERROR"
 
-		if err == taskapp.ErrTaskNotFound {
+		switch {
+		case errors.Is(err, apperrors.ErrInvalidTaskID):
+			status = http.StatusBadRequest
+			code = "INVALID_TASK_ID"
+		case errors.Is(err, apperrors.ErrInvalidQueue):
+			status = http.StatusBadRequest
+			code = "INVALID_QUEUE"
+		case errors.Is(err, apperrors.ErrTaskNotFound):
 			status = http.StatusNotFound
 			code = "TASK_NOT_FOUND"
 		}
@@ -146,9 +158,19 @@ func (h *TaskHandler) Cancel(c *gin.Context) {
 
 	err := h.service.CancelTask(c.Request.Context(), cmd)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+		status := http.StatusInternalServerError
+		code := "CANCEL_FAILED"
+		if errors.Is(err, apperrors.ErrInvalidTaskID) {
+			status = http.StatusBadRequest
+			code = "INVALID_TASK_ID"
+		}
+		if errors.Is(err, apperrors.ErrTaskNotFound) {
+			status = http.StatusNotFound
+			code = "TASK_NOT_FOUND"
+		}
+		c.JSON(status, dto.ErrorResponse{
 			Error: err.Error(),
-			Code:  "CANCEL_FAILED",
+			Code:  code,
 		})
 		return
 	}
@@ -171,9 +193,22 @@ func (h *TaskHandler) Delete(c *gin.Context) {
 
 	err := h.service.DeleteTask(c.Request.Context(), cmd)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+		status := http.StatusInternalServerError
+		code := "DELETE_FAILED"
+		switch {
+		case errors.Is(err, apperrors.ErrInvalidTaskID):
+			status = http.StatusBadRequest
+			code = "INVALID_TASK_ID"
+		case errors.Is(err, apperrors.ErrInvalidQueue):
+			status = http.StatusBadRequest
+			code = "INVALID_QUEUE"
+		case errors.Is(err, apperrors.ErrTaskNotFound):
+			status = http.StatusNotFound
+			code = "TASK_NOT_FOUND"
+		}
+		c.JSON(status, dto.ErrorResponse{
 			Error: err.Error(),
-			Code:  "DELETE_FAILED",
+			Code:  code,
 		})
 		return
 	}

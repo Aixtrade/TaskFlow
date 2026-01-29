@@ -57,8 +57,9 @@ grpc_services:
     python:  # 服务名称
       address: "localhost:50051"  # Docker 中使用: python-grpc-service:50051
       timeout: 600s
-      pool_size: 10
       health_check_interval: 30s
+      max_retries: 3
+      retry_delay: 1s
 ```
 
 ## 示例任务
@@ -71,7 +72,7 @@ curl -X POST http://localhost:8080/api/v1/tasks \
   -d '{
     "type": "grpc_task",
     "payload": {
-      "service": "python",
+      "service": "llm",
       "method": "demo",
       "data": {
         "message": "Hello TaskFlow",
@@ -90,7 +91,7 @@ curl -X POST http://localhost:8080/api/v1/tasks \
   -d '{
     "type": "grpc_task",
     "payload": {
-      "service": "python",
+      "service": "llm",
       "method": "chat",
       "data": {
         "prompt": "你好，请介绍一下自己",
@@ -113,7 +114,7 @@ curl -X POST http://localhost:8080/api/v1/tasks \
   -d '{
     "type": "grpc_task",
     "payload": {
-      "service": "python",
+      "service": "llm",
       "method": "backtest",
       "data": {
         "strategy_id": "momentum_v1",

@@ -17,9 +17,10 @@ import (
 
 	taskapp "github.com/Aixtrade/TaskFlow/internal/application/task"
 	"github.com/Aixtrade/TaskFlow/internal/config"
-	asynqqueue "github.com/Aixtrade/TaskFlow/internal/infrastructure/queue/asynq"
 	"github.com/Aixtrade/TaskFlow/internal/infrastructure/observability/logging"
+	asynqqueue "github.com/Aixtrade/TaskFlow/internal/infrastructure/queue/asynq"
 	httpserver "github.com/Aixtrade/TaskFlow/internal/interfaces/http"
+	"github.com/Aixtrade/TaskFlow/pkg/progress"
 )
 
 func main() {
@@ -70,6 +71,11 @@ func main() {
 		Logger:      logger,
 		TaskService: taskService,
 		RedisClient: redisClient,
+		Progress: progress.StreamOptions{
+			MaxLen:      cfg.Progress.MaxLen,
+			TTL:         cfg.Progress.TTL,
+			ReadTimeout: cfg.Progress.ReadTimeout,
+		},
 	})
 
 	engine := router.Setup()
@@ -78,9 +84,9 @@ func main() {
 	srv := &http.Server{
 		Addr:         addr,
 		Handler:      engine,
-		ReadTimeout:  30 * time.Second,    // 增加读取超时
-		WriteTimeout: 0,                    // SSE 需要无限写入超时
-		IdleTimeout:  120 * time.Second,   // 增加空闲超时
+		ReadTimeout:  30 * time.Second,  // 增加读取超时
+		WriteTimeout: 0,                 // SSE 需要无限写入超时
+		IdleTimeout:  120 * time.Second, // 增加空闲超时
 	}
 
 	go func() {

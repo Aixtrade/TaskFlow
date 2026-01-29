@@ -21,7 +21,6 @@ import (
 type ClientConfig struct {
 	Address             string        `mapstructure:"address"`
 	Timeout             time.Duration `mapstructure:"timeout"`
-	PoolSize            int           `mapstructure:"pool_size"`
 	HealthCheckInterval time.Duration `mapstructure:"health_check_interval"`
 	MaxRetries          int           `mapstructure:"max_retries"`
 	RetryDelay          time.Duration `mapstructure:"retry_delay"`
@@ -31,7 +30,6 @@ type ClientConfig struct {
 func DefaultClientConfig() ClientConfig {
 	return ClientConfig{
 		Timeout:             300 * time.Second,
-		PoolSize:            5,
 		HealthCheckInterval: 30 * time.Second,
 		MaxRetries:          3,
 		RetryDelay:          time.Second,
@@ -60,11 +58,14 @@ func NewStreamingGRPCClient(config ClientConfig, logger *zap.Logger) (*Streaming
 	if config.Timeout == 0 {
 		config.Timeout = DefaultClientConfig().Timeout
 	}
-	if config.PoolSize == 0 {
-		config.PoolSize = DefaultClientConfig().PoolSize
-	}
 	if config.HealthCheckInterval == 0 {
 		config.HealthCheckInterval = DefaultClientConfig().HealthCheckInterval
+	}
+	if config.MaxRetries == 0 {
+		config.MaxRetries = DefaultClientConfig().MaxRetries
+	}
+	if config.RetryDelay == 0 {
+		config.RetryDelay = DefaultClientConfig().RetryDelay
 	}
 
 	c := &StreamingGRPCClient{
@@ -95,6 +96,7 @@ func (c *StreamingGRPCClient) connect() error {
 		}),
 		grpc.WithChainUnaryInterceptor(
 			LoggingUnaryInterceptor(c.logger),
+			RetryUnaryInterceptor(c.config.MaxRetries, c.config.RetryDelay, c.logger),
 			MetadataUnaryInterceptor("taskflow-worker"),
 		),
 		grpc.WithChainStreamInterceptor(

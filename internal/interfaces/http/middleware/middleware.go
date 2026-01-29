@@ -5,28 +5,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 	"go.uber.org/zap"
-)
-
-var (
-	httpRequestsTotal = promauto.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "taskflow_http_requests_total",
-			Help: "Total number of HTTP requests",
-		},
-		[]string{"method", "path", "status"},
-	)
-
-	httpRequestDuration = promauto.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name:    "taskflow_http_request_duration_seconds",
-			Help:    "HTTP request duration in seconds",
-			Buckets: prometheus.DefBuckets,
-		},
-		[]string{"method", "path"},
-	)
 )
 
 func Logger(logger *zap.Logger) gin.HandlerFunc {
@@ -40,6 +19,7 @@ func Logger(logger *zap.Logger) gin.HandlerFunc {
 		latency := time.Since(start)
 		status := c.Writer.Status()
 
+		requestID := c.GetString("request_id")
 		fields := []zap.Field{
 			zap.Int("status", status),
 			zap.String("method", c.Request.Method),
@@ -48,6 +28,7 @@ func Logger(logger *zap.Logger) gin.HandlerFunc {
 			zap.Duration("latency", latency),
 			zap.String("ip", c.ClientIP()),
 			zap.String("user-agent", c.Request.UserAgent()),
+			zap.String("request_id", requestID),
 		}
 
 		if len(c.Errors) > 0 {
@@ -62,47 +43,6 @@ func Logger(logger *zap.Logger) gin.HandlerFunc {
 		default:
 			logger.Info("request", fields...)
 		}
-	}
-}
-
-func Metrics() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		start := time.Now()
-		path := c.FullPath()
-		if path == "" {
-			path = "unknown"
-		}
-
-		c.Next()
-
-		duration := time.Since(start).Seconds()
-		status := c.Writer.Status()
-
-		httpRequestsTotal.WithLabelValues(
-			c.Request.Method,
-			path,
-			statusCodeToString(status),
-		).Inc()
-
-		httpRequestDuration.WithLabelValues(
-			c.Request.Method,
-			path,
-		).Observe(duration)
-	}
-}
-
-func statusCodeToString(status int) string {
-	switch {
-	case status >= 500:
-		return "5xx"
-	case status >= 400:
-		return "4xx"
-	case status >= 300:
-		return "3xx"
-	case status >= 200:
-		return "2xx"
-	default:
-		return "1xx"
 	}
 }
 

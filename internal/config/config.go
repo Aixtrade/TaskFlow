@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -13,7 +14,7 @@ type Config struct {
 	Redis        RedisConfig        `mapstructure:"redis"`
 	Queues       QueuesConfig       `mapstructure:"queues"`
 	Logging      LoggingConfig      `mapstructure:"logging"`
-	Metrics      MetricsConfig      `mapstructure:"metrics"`
+	Progress     ProgressConfig     `mapstructure:"progress"`
 	GRPCServices GRPCServicesConfig `mapstructure:"grpc_services"`
 }
 
@@ -33,7 +34,8 @@ type HTTPConfig struct {
 }
 
 type WorkerConfig struct {
-	Concurrency int `mapstructure:"concurrency"`
+	Concurrency int                `mapstructure:"concurrency"`
+	Health      WorkerHealthConfig `mapstructure:"health"`
 }
 
 type RedisConfig struct {
@@ -54,9 +56,16 @@ type LoggingConfig struct {
 	Format string `mapstructure:"format"`
 }
 
-type MetricsConfig struct {
+type ProgressConfig struct {
+	MaxLen      int64         `mapstructure:"max_len"`
+	TTL         time.Duration `mapstructure:"ttl"`
+	ReadTimeout time.Duration `mapstructure:"read_timeout"`
+}
+
+type WorkerHealthConfig struct {
 	Enabled bool   `mapstructure:"enabled"`
-	Path    string `mapstructure:"path"`
+	Host    string `mapstructure:"host"`
+	Port    int    `mapstructure:"port"`
 }
 
 // GRPCServicesConfig gRPC 服务配置
@@ -75,8 +84,6 @@ type GRPCServiceConfig struct {
 	Address string `mapstructure:"address"`
 	// Timeout 超时时间
 	Timeout time.Duration `mapstructure:"timeout"`
-	// PoolSize 连接池大小
-	PoolSize int `mapstructure:"pool_size"`
 	// HealthCheckInterval 健康检查间隔
 	HealthCheckInterval time.Duration `mapstructure:"health_check_interval"`
 	// MaxRetries 最大重试次数
@@ -111,7 +118,51 @@ func Load(configPath string) (*Config, error) {
 		return nil, err
 	}
 
+	cfg.applyDefaults()
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
+
 	return &cfg, nil
+}
+
+func (c *Config) applyDefaults() {
+	if c.Progress.MaxLen == 0 {
+		c.Progress.MaxLen = 1000
+	}
+	if c.Progress.TTL == 0 {
+		c.Progress.TTL = time.Hour
+	}
+	if c.Progress.ReadTimeout == 0 {
+		c.Progress.ReadTimeout = 30 * time.Second
+	}
+}
+
+func (c *Config) Validate() error {
+	if c.Server.HTTP.Port <= 0 {
+		return fmt.Errorf("server.http.port must be greater than 0")
+	}
+	if c.Server.Worker.Concurrency <= 0 {
+		return fmt.Errorf("server.worker.concurrency must be greater than 0")
+	}
+	if c.Queues.Critical <= 0 || c.Queues.High <= 0 || c.Queues.Default <= 0 || c.Queues.Low <= 0 {
+		return fmt.Errorf("queues weights must be greater than 0")
+	}
+	if c.Progress.MaxLen < 0 {
+		return fmt.Errorf("progress.max_len must be greater than or equal to 0")
+	}
+	if c.Progress.TTL < 0 {
+		return fmt.Errorf("progress.ttl must be greater than or equal to 0")
+	}
+	if c.Progress.ReadTimeout < 0 {
+		return fmt.Errorf("progress.read_timeout must be greater than or equal to 0")
+	}
+	if c.Server.Worker.Health.Enabled {
+		if c.Server.Worker.Health.Port <= 0 {
+			return fmt.Errorf("server.worker.health.port must be greater than 0")
+		}
+	}
+	return nil
 }
 
 func (c *Config) IsDevelopment() bool {

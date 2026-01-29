@@ -12,14 +12,14 @@
 - **定时任务** - 支持任务定时执行
 - **任务去重** - 唯一性约束防止重复处理
 - **重试机制** - 自动重试，支持配置最大重试次数
-- **可观测性** - 内置 Prometheus 指标和结构化日志
+- **可观测性** - 结构化日志
 - **健康检查** - 健康、就绪、存活检查端点
 
 ## 快速开始
 
 ### 环境要求
 
-- Go 1.21+
+- Go 1.25.1
 - Redis 6.0+
 - Docker（可选）
 
@@ -116,6 +116,10 @@ server:
     port: 8080
   worker:
     concurrency: 10
+    health:
+      enabled: true
+      host: 0.0.0.0
+      port: 8082
 
 redis:
   addr: localhost:6379
@@ -127,6 +131,11 @@ queues:
   high: 5
   default: 3
   low: 1
+
+progress:
+  max_len: 1000
+  ttl: 1h
+  read_timeout: 30s
 ```
 
 环境变量使用 `TASKFLOW_` 前缀：
@@ -158,7 +167,6 @@ make clean
 
 ## 监控
 
-- **指标**: 访问 `/metrics`（Prometheus 格式）
 - **健康检查**: `GET /health`
 - **就绪检查**: `GET /ready`
 - **存活检查**: `GET /live`

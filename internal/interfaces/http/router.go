@@ -2,7 +2,6 @@ package http
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 
@@ -27,6 +26,7 @@ type RouterConfig struct {
 	Logger      *zap.Logger
 	TaskService *taskapp.Service
 	RedisClient *redis.Client
+	Progress    progress.StreamOptions
 }
 
 func NewRouter(cfg RouterConfig) *Router {
@@ -37,7 +37,7 @@ func NewRouter(cfg RouterConfig) *Router {
 	engine := gin.New()
 
 	// 创建进度订阅器
-	progressSubscriber := progress.NewSubscriber(cfg.RedisClient, cfg.Logger)
+	progressSubscriber := progress.NewSubscriber(cfg.RedisClient, cfg.Logger, cfg.Progress)
 
 	return &Router{
 		engine:             engine,
@@ -51,13 +51,11 @@ func NewRouter(cfg RouterConfig) *Router {
 
 func (r *Router) Setup() *gin.Engine {
 	r.engine.Use(middleware.Recovery(r.logger))
-	r.engine.Use(middleware.Logger(r.logger))
-	r.engine.Use(middleware.Metrics())
-	r.engine.Use(middleware.CORS())
 	r.engine.Use(middleware.RequestID())
+	r.engine.Use(middleware.Logger(r.logger))
+	r.engine.Use(middleware.CORS())
 
 	r.setupHealthRoutes()
-	r.setupMetricsRoutes()
 	r.setupAPIRoutes()
 
 	return r.engine
@@ -69,12 +67,6 @@ func (r *Router) setupHealthRoutes() {
 	r.engine.GET("/health", healthHandler.Health)
 	r.engine.GET("/ready", healthHandler.Ready)
 	r.engine.GET("/live", healthHandler.Live)
-}
-
-func (r *Router) setupMetricsRoutes() {
-	if r.cfg.Metrics.Enabled {
-		r.engine.GET(r.cfg.Metrics.Path, gin.WrapH(promhttp.Handler()))
-	}
 }
 
 func (r *Router) setupAPIRoutes() {

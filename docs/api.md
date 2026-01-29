@@ -388,7 +388,11 @@ General health check endpoint.
 
 ```json
 {
-  "status": "ok"
+  "status": "healthy",
+  "timestamp": "2026-01-29T12:00:00Z",
+  "services": {
+    "redis": "healthy"
+  }
 }
 ```
 
@@ -404,7 +408,7 @@ Readiness check (verifies Redis connection).
 
 ```json
 {
-  "status": "ok"
+  "status": "ready"
 }
 ```
 
@@ -412,8 +416,8 @@ Readiness check (verifies Redis connection).
 
 ```json
 {
-  "status": "error",
-  "message": "redis connection failed"
+  "status": "not ready",
+  "reason": "redis unavailable"
 }
 ```
 
@@ -429,23 +433,9 @@ Liveness check endpoint.
 
 ```json
 {
-  "status": "ok"
+  "status": "alive"
 }
 ```
-
----
-
-## Metrics
-
-### Prometheus Metrics
-
-**Endpoint:** `GET /metrics`
-
-Returns Prometheus-formatted metrics including:
-- HTTP request counts and latencies
-- Task processing counts and durations
-- Queue depths
-- Go runtime metrics
 
 ---
 

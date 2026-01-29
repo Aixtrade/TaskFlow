@@ -60,14 +60,6 @@ type GetTaskResponse struct {
 	NextProcessAt string `json:"next_process_at,omitempty"`
 }
 
-type ListTasksRequest struct {
-	Queue  string   `form:"queue"`
-	Status []string `form:"status"`
-	Type   []string `form:"type"`
-	Offset int      `form:"offset,default=0"`
-	Limit  int      `form:"limit,default=20"`
-}
-
 type QueueStatsResponse struct {
 	Queue     string `json:"queue"`
 	Pending   int    `json:"pending"`

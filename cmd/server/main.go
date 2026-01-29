@@ -1,11 +1,16 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"flag"
+	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
@@ -49,7 +54,11 @@ func main() {
 	defer redisClient.Close()
 
 	// 创建进度发布器
-	progressPublisher := progress.NewPublisher(redisClient, logger)
+	progressPublisher := progress.NewPublisher(redisClient, logger, progress.StreamOptions{
+		MaxLen:      cfg.Progress.MaxLen,
+		TTL:         cfg.Progress.TTL,
+		ReadTimeout: cfg.Progress.ReadTimeout,
+	})
 
 	registry := worker.NewRegistry(logger)
 	registry.Register(demo.NewHandler(logger))
@@ -62,7 +71,6 @@ func main() {
 			clientConfigs[name] = grpcclient.ClientConfig{
 				Address:             svcCfg.Address,
 				Timeout:             svcCfg.Timeout,
-				PoolSize:            svcCfg.PoolSize,
 				HealthCheckInterval: svcCfg.HealthCheckInterval,
 				MaxRetries:          svcCfg.MaxRetries,
 				RetryDelay:          svcCfg.RetryDelay,
@@ -81,8 +89,9 @@ func main() {
 			Services: clientConfigs,
 			Defaults: grpcclient.ClientConfig{
 				Timeout:             cfg.GRPCServices.Defaults.Timeout,
-				PoolSize:            cfg.GRPCServices.Defaults.PoolSize,
 				HealthCheckInterval: cfg.GRPCServices.Defaults.HealthCheckInterval,
+				MaxRetries:          cfg.GRPCServices.Defaults.MaxRetries,
+				RetryDelay:          cfg.GRPCServices.Defaults.RetryDelay,
 			},
 		}
 		registry.Register(grpctask.NewHandler(logger, clientManager, grpcTaskConfig, progressPublisher))
@@ -107,7 +116,6 @@ func main() {
 	server.Use(
 		worker.RecoveryMiddleware(logger),
 		worker.LoggingMiddleware(logger),
-		worker.MetricsMiddleware(),
 	)
 
 	registry.SetupServer(server)
@@ -118,11 +126,102 @@ func main() {
 		}
 	}()
 
+	var healthServer *http.Server
+	if cfg.Server.Worker.Health.Enabled {
+		healthMux := http.NewServeMux()
+		healthMux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+			status := "healthy"
+			services := map[string]string{}
+
+			ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+			defer cancel()
+
+			if err := redisClient.Ping(ctx).Err(); err != nil {
+				services["redis"] = "unhealthy"
+				status = "unhealthy"
+			} else {
+				services["redis"] = "healthy"
+			}
+
+			if clientManager != nil {
+				for _, svc := range clientManager.GetHealthStatus() {
+					name := fmt.Sprintf("grpc:%s", svc.Name)
+					if svc.Healthy {
+						services[name] = "healthy"
+					} else {
+						services[name] = "unhealthy"
+						status = "unhealthy"
+					}
+				}
+			}
+
+			payload := map[string]interface{}{
+				"status":    status,
+				"timestamp": time.Now().UTC().Format(time.RFC3339),
+				"services":  services,
+			}
+			if status != "healthy" {
+				w.WriteHeader(http.StatusServiceUnavailable)
+			}
+			_ = json.NewEncoder(w).Encode(payload)
+		})
+
+		healthMux.HandleFunc("/ready", func(w http.ResponseWriter, r *http.Request) {
+			ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+			defer cancel()
+
+			if err := redisClient.Ping(ctx).Err(); err != nil {
+				w.WriteHeader(http.StatusServiceUnavailable)
+				_ = json.NewEncoder(w).Encode(map[string]string{
+					"status": "not ready",
+					"reason": "redis unavailable",
+				})
+				return
+			}
+
+			if clientManager != nil && len(clientManager.UnhealthyServices()) > 0 {
+				w.WriteHeader(http.StatusServiceUnavailable)
+				_ = json.NewEncoder(w).Encode(map[string]string{
+					"status": "not ready",
+					"reason": "grpc services unavailable",
+				})
+				return
+			}
+
+			_ = json.NewEncoder(w).Encode(map[string]string{"status": "ready"})
+		})
+
+		healthMux.HandleFunc("/live", func(w http.ResponseWriter, r *http.Request) {
+			_ = json.NewEncoder(w).Encode(map[string]string{"status": "alive"})
+		})
+
+		addr := fmt.Sprintf("%s:%d", cfg.Server.Worker.Health.Host, cfg.Server.Worker.Health.Port)
+		healthServer = &http.Server{
+			Addr:              addr,
+			Handler:           healthMux,
+			ReadHeaderTimeout: 5 * time.Second,
+		}
+
+		go func() {
+			logger.Info("starting worker health server", zap.String("addr", addr))
+			if err := healthServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				logger.Fatal("failed to start worker health server", zap.Error(err))
+			}
+		}()
+	}
+
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
 	logger.Info("shutting down server...")
+	if healthServer != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		if err := healthServer.Shutdown(ctx); err != nil {
+			logger.Error("failed to shutdown health server", zap.Error(err))
+		}
+		cancel()
+	}
 	server.Shutdown()
 	logger.Info("server stopped")
 }

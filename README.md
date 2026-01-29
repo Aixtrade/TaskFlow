@@ -12,14 +12,14 @@ A distributed task queue system built with Go, using Redis and Asynq for reliabl
 - **Scheduled Tasks** - Schedule tasks for future execution
 - **Task Deduplication** - Unique task constraints to prevent duplicate processing
 - **Retry Mechanism** - Automatic retry with configurable max retries
-- **Observability** - Built-in Prometheus metrics and structured logging
+- **Observability** - Structured logging
 - **Health Checks** - Health, readiness, and liveness endpoints
 
 ## Quick Start
 
 ### Prerequisites
 
-- Go 1.21+
+- Go 1.25.1
 - Redis 6.0+
 - Docker (optional)
 
@@ -116,6 +116,10 @@ server:
     port: 8080
   worker:
     concurrency: 10
+    health:
+      enabled: true
+      host: 0.0.0.0
+      port: 8082
 
 redis:
   addr: localhost:6379
@@ -127,6 +131,11 @@ queues:
   high: 5
   default: 3
   low: 1
+
+progress:
+  max_len: 1000
+  ttl: 1h
+  read_timeout: 30s
 ```
 
 Environment variables use the `TASKFLOW_` prefix:
@@ -158,7 +167,6 @@ make clean
 
 ## Monitoring
 
-- **Metrics**: Available at `/metrics` (Prometheus format)
 - **Health Check**: `GET /health`
 - **Readiness Check**: `GET /ready`
 - **Liveness Check**: `GET /live`
