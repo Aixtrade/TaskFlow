@@ -78,9 +78,9 @@ func main() {
 	srv := &http.Server{
 		Addr:         addr,
 		Handler:      engine,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  60 * time.Second,
+		ReadTimeout:  30 * time.Second,    // 增加读取超时
+		WriteTimeout: 0,                    // SSE 需要无限写入超时
+		IdleTimeout:  120 * time.Second,   // 增加空闲超时
 	}
 
 	go func() {
